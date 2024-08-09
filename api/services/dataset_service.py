@@ -198,6 +198,28 @@ class DatasetService:
                 )
 
     @staticmethod
+    def check_embedding_model_setting(tenant_id: str, embedding_model_provider: str, embedding_model:str):
+        try:
+            model_manager = ModelManager()
+            model_manager.get_model_instance(
+                tenant_id=tenant_id,
+                provider=embedding_model_provider,
+                model_type=ModelType.TEXT_EMBEDDING,
+                model=embedding_model
+            )
+        except LLMBadRequestError:
+            raise ValueError(
+                "No Embedding Model available. Please configure a valid provider "
+                "in the Settings -> Model Provider."
+            )
+        except ProviderTokenNotInitError as ex:
+            raise ValueError(
+                f"The dataset in unavailable, due to: "
+                f"{ex.description}"
+            )
+
+
+    @staticmethod
     def update_dataset(dataset_id, data, user):
         data.pop('partial_member_list', None)
         filtered_data = {k: v for k, v in data.items() if v is not None or k == 'description'}
@@ -845,13 +867,17 @@ class DocumentService:
                         'only_main_content': website_info.get('only_main_content', False),
                         'mode': 'crawl',
                     }
+                    if len(url) > 255:
+                        document_name = url[:200] + '...'
+                    else:
+                        document_name = url
                     document = DocumentService.build_document(
                         dataset, dataset_process_rule.id,
                         document_data["data_source"]["type"],
                         document_data["doc_form"],
                         document_data["doc_language"],
                         data_source_info, created_from, position,
-                        account, url, batch
+                        account, document_name, batch
                     )
                     db.session.add(document)
                     db.session.flush()
